@@ -1,18 +1,54 @@
 const Payment = require("../models/Payment");
 const User = require("../models/User");
 const Coupon = require("../models/Coupon");
+const Referral = require("../models/Referral");
 const { isValidCourseId } = require("../config/courses");
-const CashfreeClass = require("../config/cashfree");
-const Cashfree = new CashfreeClass();
+const { getPricing, calculatePriceWithReferral } = require("../config/pricing");
+const { Cashfree } = require("cashfree-pg");
 
-const PROGRAM_PRICE = 999;
+// Cashfree v5.x configuration
+const cashfree = new Cashfree({
+  env: process.env.CASHFREE_ENV === "PRODUCTION" ? "PRODUCTION" : "SANDBOX",
+  apiVersion: "2023-08-01",
+});
 
-const calculatePricing = async (couponCode) => {
-  let originalAmount = PROGRAM_PRICE;
+// Referral reward amount
+const REFERRAL_REWARD_AMOUNT = 150; // ₹150
+
+/**
+ * Calculate pricing with course-specific pricing, coupon, and referral discounts
+ */
+const calculatePricing = async (courseId, couponCode, referralCode, userId) => {
+  // Get course-specific pricing
+  const pricing = getPricing(courseId);
+  let originalAmount = pricing.strikePrice; // Show as higher original price
+  let coursePrice = pricing.price; // Actual course price
   let discountAmount = 0;
-  let finalAmount = PROGRAM_PRICE;
+  let finalAmount = coursePrice;
   let appliedCoupon = null;
+  let appliedReferral = null;
+  let referralDiscount = 0;
 
+  // Apply referral discount first (20% off) if valid code provided
+  if (referralCode) {
+    const referrer = await User.findOne({ 
+      referralCode: referralCode.toUpperCase() 
+    });
+    
+    // Check if valid referrer and not self-referral
+    if (referrer && referrer._id.toString() !== userId.toString()) {
+      referralDiscount = Math.round(coursePrice * 0.20); // 20% discount
+      finalAmount = coursePrice - referralDiscount;
+      appliedReferral = {
+        code: referralCode.toUpperCase(),
+        referrerId: referrer._id,
+        discountPercent: 20,
+        discountAmount: referralDiscount,
+      };
+    }
+  }
+
+  // Apply coupon discount on top of referral price
   if (couponCode) {
     const coupon = await Coupon.findOne({ code: couponCode.toUpperCase() });
 
@@ -22,31 +58,41 @@ const calculatePricing = async (couponCode) => {
       (!coupon.expiresAt || new Date() <= coupon.expiresAt) &&
       (coupon.usageLimit === 0 || coupon.usedCount < coupon.usageLimit)
     ) {
+      let couponDiscount = 0;
       if (coupon.discountType === "flat") {
-        discountAmount = coupon.discountValue;
+        couponDiscount = coupon.discountValue;
       } else if (coupon.discountType === "percentage") {
-        discountAmount = (PROGRAM_PRICE * coupon.discountValue) / 100;
+        couponDiscount = Math.round((finalAmount * coupon.discountValue) / 100);
         if (coupon.maxDiscount > 0) {
-          discountAmount = Math.min(discountAmount, coupon.maxDiscount);
+          couponDiscount = Math.min(couponDiscount, coupon.maxDiscount);
         }
       }
 
-      finalAmount = Math.max(PROGRAM_PRICE - discountAmount, 0);
+      finalAmount = Math.max(finalAmount - couponDiscount, 0);
+      discountAmount = referralDiscount + couponDiscount;
       appliedCoupon = coupon;
+    } else {
+      discountAmount = referralDiscount;
     }
+  } else {
+    discountAmount = referralDiscount;
   }
 
   return {
     originalAmount,
+    coursePrice,
     discountAmount,
     finalAmount,
     appliedCoupon,
+    appliedReferral,
+    referralDiscount,
+    courseName: pricing.name,
   };
 };
 
 const createOrder = async (req, res) => {
   try {
-    const { couponCode, courseId } = req.body;
+    const { couponCode, courseId, referralCode } = req.body;
 
     const user = await User.findById(req.user._id);
 
@@ -64,13 +110,31 @@ const createOrder = async (req, res) => {
       });
     }
 
-    const { originalAmount, discountAmount, finalAmount, appliedCoupon } =
-      await calculatePricing(couponCode);
+    // Calculate pricing with referral and coupon discounts
+    const { 
+      originalAmount, 
+      coursePrice,
+      discountAmount, 
+      finalAmount, 
+      appliedCoupon, 
+      appliedReferral,
+      referralDiscount,
+      courseName 
+    } = await calculatePricing(courseId, couponCode, referralCode, user._id);
 
     const orderId = `order_${Date.now()}`;
 
+    // Ensure minimum order amount is ₹10 (Cashfree requirement)
+    const MIN_ORDER_AMOUNT = 10;
+    if (finalAmount < MIN_ORDER_AMOUNT) {
+      return res.status(400).json({
+        success: false,
+        message: `Order amount too low. Minimum amount is ₹${MIN_ORDER_AMOUNT}. Please use a smaller discount coupon.`,
+      });
+    }
+
     const request = {
-      order_amount: finalAmount,
+      order_amount: parseFloat(finalAmount.toFixed(2)),
       order_currency: "INR",
       order_id: orderId,
       customer_details: {
@@ -84,19 +148,52 @@ const createOrder = async (req, res) => {
       },
     };
 
-    const cashfreeResponse = await Cashfree.PGCreateOrder("2023-08-01", request);
+    // Create order using Cashfree v5.x API
+    cashfree.setAppId(process.env.CASHFREE_APP_ID);
+    cashfree.setSecretKey(process.env.CASHFREE_SECRET_KEY);
+    
+    const cashfreeResponse = await cashfree.PGCreateOrder(request);
 
-    await Payment.create({
+    // Create payment record with referral info
+    const payment = await Payment.create({
       userId: user._id,
       orderId,
       gatewayOrderId: cashfreeResponse.data.cf_order_id,
       originalAmount,
+      coursePrice,
       finalAmount,
       discountAmount,
       couponCode: appliedCoupon ? appliedCoupon.code : "",
+      referralCode: appliedReferral ? appliedReferral.code : "",
+      referralDiscount,
       courseId,
+      courseName,
       paymentStatus: "pending",
     });
+
+    // If referral code was used, update user's referral info and create referral record
+    if (appliedReferral) {
+      // Update user with referral info
+      if (!user.referredBy) {
+        user.referredBy = appliedReferral.referrerId;
+        user.usedReferralCode = appliedReferral.code;
+        await user.save();
+      }
+
+      // Create or update referral tracking record
+      await Referral.findOneAndUpdate(
+        { referredId: user._id },
+        {
+          referrerId: appliedReferral.referrerId,
+          referredId: user._id,
+          referralCode: appliedReferral.code,
+          status: "signed_up",
+          orderId: orderId,
+          discountAmount: appliedReferral.discountAmount,
+        },
+        { upsert: true, new: true }
+      );
+    }
 
     const cashfreeMode =
       process.env.CASHFREE_ENV === "PRODUCTION" ? "production" : "sandbox";
@@ -132,7 +229,10 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    const cashfreeResponse = await Cashfree.PGFetchOrder("2023-08-01", orderId);
+    cashfree.setAppId(process.env.CASHFREE_APP_ID);
+    cashfree.setSecretKey(process.env.CASHFREE_SECRET_KEY);
+    
+    const cashfreeResponse = await cashfree.PGFetchOrder(orderId);
     const orderData = cashfreeResponse.data;
 
     if (orderData.order_status === "PAID") {
@@ -151,6 +251,11 @@ const verifyPayment = async (req, res) => {
             { code: payment.couponCode },
             { $inc: { usedCount: 1 } }
           );
+        }
+
+        // Process referral reward if referral code was used
+        if (payment.referralCode && payment.referralDiscount > 0) {
+          await processReferralReward(payment.userId, payment._id, payment.orderId);
         }
       }
 
@@ -256,6 +361,11 @@ const cashfreeWebhook = async (req, res) => {
           { $inc: { usedCount: 1 } }
         );
       }
+
+      // Process referral reward if referral code was used
+      if (payment.referralCode && payment.referralDiscount > 0) {
+        await processReferralReward(payment.userId, payment._id, payment.orderId);
+      }
     }
 
     return res.status(200).json({
@@ -271,9 +381,61 @@ const cashfreeWebhook = async (req, res) => {
   }
 };
 
+/**
+ * Process referral reward after successful payment
+ */
+const processReferralReward = async (userId, paymentId, orderId) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user || !user.referredBy) {
+      return { success: false, message: "No referrer found" };
+    }
+
+    // Check if reward already given
+    const existingReferral = await Referral.findOne({
+      referredId: userId,
+      status: "rewarded",
+    });
+
+    if (existingReferral) {
+      return { success: false, message: "Reward already given" };
+    }
+
+    // Update or create referral record
+    const referral = await Referral.findOneAndUpdate(
+      { referredId: userId },
+      {
+        status: "rewarded",
+        paymentId,
+        orderId,
+        rewardAmount: REFERRAL_REWARD_AMOUNT,
+        rewardGiven: true,
+        rewardGivenAt: new Date(),
+      },
+      { upsert: true, new: true }
+    );
+
+    // Update referrer's wallet
+    const referrer = await User.findById(user.referredBy);
+    if (referrer) {
+      referrer.walletBalance += REFERRAL_REWARD_AMOUNT;
+      referrer.totalEarnings += REFERRAL_REWARD_AMOUNT;
+      referrer.referralCount += 1;
+      await referrer.save();
+      console.log(`Referral reward of ₹${REFERRAL_REWARD_AMOUNT} added to ${referrer.email}`);
+    }
+
+    return { success: true, referral };
+  } catch (error) {
+    console.error("Referral reward error:", error);
+    return { success: false, message: error.message };
+  }
+};
+
 module.exports = {
   createOrder,
   verifyPayment,
   getPaymentStatus,
   cashfreeWebhook,
+  processReferralReward,
 };

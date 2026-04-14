@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageWrapper from "@/components/common/PageWrapper";
 import Loader from "@/components/common/Loader";
+import { Copy, Share2, Wallet, Users, Gift } from "lucide-react";
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://learnmythos.app/api";
 
 export default function DashboardContent() {
   const router = useRouter();
@@ -16,11 +17,64 @@ export default function DashboardContent() {
   const [course, setCourse] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [showWaModal, setShowWaModal] = useState(false);
+  
+  // Referral state
+  const [referralStats, setReferralStats] = useState(null);
+  const [referralLoading, setReferralLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   const openWhatsapp = useCallback(() => {
     if (!course?.whatsappUrl) return;
     window.open(course.whatsappUrl, "_blank", "noopener,noreferrer");
   }, [course]);
+
+  // Load referral stats
+  useEffect(() => {
+    async function loadReferralStats() {
+      try {
+        const res = await fetch(`${apiUrl}/referral/stats`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (data.success) {
+          setReferralStats(data.stats);
+        }
+      } catch (error) {
+        console.error("Failed to load referral stats:", error);
+      } finally {
+        setReferralLoading(false);
+      }
+    }
+    
+    if (!booting) {
+      loadReferralStats();
+    }
+  }, [booting]);
+
+  // Copy referral code
+  const copyReferralCode = async () => {
+    if (!referralStats?.referralCode) return;
+    
+    const referralLink = `${window.location.origin}?ref=${referralStats.referralCode}`;
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  // Share on WhatsApp
+  const shareOnWhatsApp = () => {
+    if (!referralStats?.referralCode) return;
+    
+    const referralLink = `${window.location.origin}?ref=${referralStats.referralCode}`;
+    const message = encodeURIComponent(
+      `Hey! Join Learn Mythos internship program and get 20% OFF using my referral code: ${referralStats.referralCode}\n\n${referralLink}\n\nLimited spots available! 🔥`
+    );
+    window.open(`https://wa.me/?text=${message}`, "_blank", "noopener,noreferrer");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -230,6 +284,71 @@ export default function DashboardContent() {
             )}
           </div>
         </div>
+
+        {/* Referral Section */}
+        {!referralLoading && referralStats && (
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-indigo-600 rounded-lg">
+                <Gift className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Refer & Earn</h2>
+                <p className="text-sm text-slate-600">Invite friends and earn ₹150 per successful referral</p>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-white rounded-xl p-4 text-center">
+                <Wallet className="h-5 w-5 text-green-600 mx-auto mb-1" />
+                <p className="text-2xl font-bold text-slate-900">₹{referralStats.walletBalance || 0}</p>
+                <p className="text-xs text-slate-500">Wallet Balance</p>
+              </div>
+              <div className="bg-white rounded-xl p-4 text-center">
+                <Users className="h-5 w-5 text-indigo-600 mx-auto mb-1" />
+                <p className="text-2xl font-bold text-slate-900">{referralStats.successfulReferrals || 0}</p>
+                <p className="text-xs text-slate-500">Successful</p>
+              </div>
+              <div className="bg-white rounded-xl p-4 text-center">
+                <Gift className="h-5 w-5 text-purple-600 mx-auto mb-1" />
+                <p className="text-2xl font-bold text-slate-900">₹{referralStats.totalEarnings || 0}</p>
+                <p className="text-xs text-slate-500">Total Earned</p>
+              </div>
+            </div>
+
+            {/* Referral Code */}
+            <div className="bg-white rounded-xl p-4">
+              <p className="text-sm text-slate-500 mb-2">Your Referral Code</p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-slate-100 rounded-lg px-4 py-3">
+                  <p className="font-mono text-lg font-bold text-slate-900 tracking-wider">
+                    {referralStats.referralCode}
+                  </p>
+                </div>
+                <button
+                  onClick={copyReferralCode}
+                  className="flex items-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                  title="Copy referral link"
+                >
+                  <Copy className="h-4 w-4" />
+                  <span className="text-sm font-medium">{copied ? "Copied!" : "Copy"}</span>
+                </button>
+                <button
+                  onClick={shareOnWhatsApp}
+                  className="flex items-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  title="Share on WhatsApp"
+                >
+                  <Share2 className="h-4 w-4" />
+                  <span className="text-sm font-medium">WhatsApp</span>
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                Share this code with friends. They get 20% OFF and you earn ₹150 when they complete payment!
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {showWaModal && (

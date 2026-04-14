@@ -2,6 +2,7 @@ const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/User");
 const { isAdminEmail } = require("../utils/adminEmails");
+const { generateReferralCode } = require("./pricing");
 
 passport.use(
   new GoogleStrategy(
@@ -23,12 +24,20 @@ passport.use(
         }
 
         const email = profile.emails[0].value;
+        
+        // Generate unique referral code
+        const referralCode = generateReferralCode(profile.id);
+        
         const newUser = await User.create({
           googleId: profile.id,
           fullName: profile.displayName,
           email,
           profilePicture: profile.photos?.[0]?.value || "",
           role: isAdminEmail(email) ? "admin" : "user",
+          referralCode,
+          walletBalance: 0,
+          totalEarnings: 0,
+          referralCount: 0,
         });
 
         return done(null, newUser);

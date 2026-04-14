@@ -35,6 +35,23 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    courseName: {
+      type: String,
+      default: "",
+    },
+    coursePrice: {
+      type: Number,
+      default: 0,
+    },
+    // Referral tracking
+    referralCode: {
+      type: String,
+      default: "",
+    },
+    referralDiscount: {
+      type: Number,
+      default: 0,
+    },
     paymentStatus: {
       type: String,
       enum: ["pending", "success", "failed"],

@@ -10,6 +10,8 @@ const couponRoutes = require("./routes/couponRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const coursesRoutes = require("./routes/coursesRoutes");
+const referralRoutes = require("./routes/referralRoutes");
+const internshipRoutes = require("./routes/internshipRoutes");
 
 const app = express();
 
@@ -46,9 +48,11 @@ app.get("/", (req, res) => {
 app.use("/api/test", testRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/courses", coursesRoutes);
+app.use("/api/internships", internshipRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/referral", referralRoutes);
 app.use("/api/admin", adminRoutes);
 
 module.exports = app;

@@ -1,23 +1,28 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageWrapper from "@/components/common/PageWrapper";
 import Loader from "@/components/common/Loader";
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://learnmythos.app/api";
 
 export default function CheckoutFlow() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [courses, setCourses] = useState([]);
   const [courseId, setCourseId] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState(null);
   const [coupon, setCoupon] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+  const [referralApplied, setReferralApplied] = useState(false);
   const [message, setMessage] = useState("");
   const [pricing, setPricing] = useState({
-    originalAmount: 999,
+    originalAmount: 0,
+    coursePrice: 0,
     discountAmount: 0,
-    finalAmount: 999,
+    finalAmount: 0,
   });
   const [loading, setLoading] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -32,6 +37,76 @@ export default function CheckoutFlow() {
       }
     } catch {
       setMessage("Could not load program tracks. Refresh and try again.");
+    }
+  }, []);
+
+  // Check for referral code in URL
+  useEffect(() => {
+    const refCode = searchParams.get("ref");
+    if (refCode) {
+      setReferralCode(refCode);
+      validateReferralCode(refCode);
+    }
+  }, [searchParams]);
+
+  // Validate referral code
+  const validateReferralCode = async (code) => {
+    try {
+      const res = await fetch(`${apiUrl}/referral/validate?code=${code}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReferralApplied(true);
+        setMessage(`Referral code applied! You'll get ${data.discount.percent}% OFF`);
+        // Fetch updated pricing with referral
+        if (courseId) {
+          await fetchCoursePricing(courseId, coupon, code);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to validate referral code:", error);
+    }
+  };
+
+  // Apply referral code manually
+  const handleApplyReferral = async () => {
+    if (!referralCode.trim()) {
+      setMessage("Please enter a referral code");
+      return;
+    }
+    await validateReferralCode(referralCode);
+  };
+
+  // Fetch pricing when course is selected
+  const fetchCoursePricing = useCallback(async (selectedCourseId, couponCode = "", refCode = "") => {
+    if (!selectedCourseId) return;
+    
+    try {
+      const params = new URLSearchParams({
+        courseId: selectedCourseId,
+        ...(couponCode && { couponCode }),
+        ...(refCode && { referralCode: refCode }),
+      });
+      
+      const res = await fetch(`${apiUrl}/payments/course-pricing?${params}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setPricing({
+          originalAmount: data.originalAmount,
+          coursePrice: data.coursePrice,
+          discountAmount: data.discountAmount,
+          finalAmount: data.finalAmount,
+        });
+        if (data.message) {
+          setMessage(data.message);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch pricing:", error);
     }
   }, []);
 
@@ -75,27 +150,17 @@ export default function CheckoutFlow() {
       return;
     }
 
+    if (!courseId) {
+      setMessage("Please select a course first");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
     try {
-      const res = await fetch(`${apiUrl}/coupons/validate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ code: coupon }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        setPricing(data.pricing);
-        setMessage(data.message);
-      } else {
-        setMessage(data.message || "Invalid coupon");
-      }
+      // Fetch pricing with coupon for selected course
+      await fetchCoursePricing(courseId, coupon, referralApplied ? referralCode : "");
     } catch {
       setMessage("Failed to apply coupon");
     } finally {
@@ -122,6 +187,7 @@ export default function CheckoutFlow() {
         body: JSON.stringify({
           couponCode: coupon,
           courseId,
+          referralCode: referralApplied ? referralCode : null,
         }),
       });
 
@@ -189,16 +255,17 @@ export default function CheckoutFlow() {
   return (
     <PageWrapper>
       <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-          <h1 className="text-3xl font-bold text-slate-900">Checkout</h1>
-          <p className="mt-2 text-slate-600">
+        <div className="surface-card-premium rounded-[1.75rem] p-8">
+          <h1 className="font-display text-3xl font-bold text-white">Checkout</h1>
+          <p className="mt-2 text-slate-400">
             Pick your internship track, then pay securely. Your WhatsApp cohort
             link matches the track you choose.
           </p>
 
           <div className="mt-8">
-            <p className="text-sm font-semibold text-slate-800">
-              1. Select your program track <span className="text-red-600">*</span>
+            <p className="text-sm font-semibold text-slate-200">
+              1. Select your program track{" "}
+              <span className="text-rose-400">*</span>
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {courses.map((c) => {
@@ -209,16 +276,26 @@ export default function CheckoutFlow() {
                     type="button"
                     onClick={() => {
                       setCourseId(c.id);
+                      setSelectedCourse(c);
                       setMessage("");
+                      // Fetch pricing for selected course
+                      fetchCoursePricing(c.id, coupon, referralApplied ? referralCode : "");
                     }}
-                    className={`rounded-2xl border p-4 text-left transition ${
+                    className={`rounded-2xl border p-4 text-left premium-transition ${
                       selected
-                        ? "border-blue-600 bg-blue-50 ring-2 ring-blue-200"
-                        : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                        ? "border-sky-500/60 bg-sky-500/15 ring-2 ring-sky-400/30"
+                        : "border-white/10 bg-white/[0.04] hover:border-white/20 hover:bg-white/[0.07]"
                     }`}
                   >
-                    <p className="font-semibold text-slate-900">{c.name}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                    <div className="flex items-start justify-between">
+                      <p className="font-semibold text-white">{c.name}</p>
+                      {selected && (
+                        <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-xs text-sky-400">
+                          ₹{c.price || 999}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
                       {c.description}
                     </p>
                   </button>
@@ -228,43 +305,61 @@ export default function CheckoutFlow() {
           </div>
 
           <div className="mt-8 space-y-4">
-            <div className="rounded-2xl bg-slate-50 p-5">
-              <p className="text-sm text-slate-500">Program</p>
-              <p className="mt-1 font-semibold text-slate-900">
-                InternCraft Academy Internship Program
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+              <p className="text-sm text-slate-500">Selected Program</p>
+              <p className="mt-1 font-semibold text-white">
+                {selectedCourse ? selectedCourse.name : "Please select a program track"}
               </p>
+              {selectedCourse && (
+                <p className="mt-1 text-xs text-slate-400">
+                  ₹{selectedCourse.price || pricing.coursePrice} • {selectedCourse.duration || "6 weeks"}
+                </p>
+              )}
             </div>
 
-            <div className="rounded-2xl bg-slate-50 p-5">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
               <p className="text-sm text-slate-500">Learning Mode</p>
-              <p className="mt-1 font-semibold text-slate-900">
+              <p className="mt-1 font-semibold text-white">
                 Live + Recorded
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-slate-900">Order Summary</h2>
+        <div className="surface-card-premium rounded-[1.75rem] p-8">
+          <h2 className="font-display text-2xl font-bold text-white">
+            Order summary
+          </h2>
 
           <div className="mt-6 space-y-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-600">Program Fee</span>
-              <span className="font-medium text-slate-900">
-                ₹{pricing.originalAmount}
+              <span className="text-slate-400">
+                {selectedCourse ? selectedCourse.name : "Program fee"}
               </span>
+              <div className="text-right">
+                {pricing.originalAmount > pricing.coursePrice && (
+                  <span className="mr-2 text-xs text-slate-500 line-through">
+                    ₹{pricing.originalAmount}
+                  </span>
+                )}
+                <span className="font-medium text-white">
+                  ₹{pricing.coursePrice || (selectedCourse?.price || 0)}
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-600">Discount</span>
-              <span className="font-medium text-green-600">
-                - ₹{pricing.discountAmount}
-              </span>
-            </div>
+            {pricing.discountAmount > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-400">Discount</span>
+                <span className="font-medium text-emerald-400">
+                  - ₹{pricing.discountAmount}
+                </span>
+              </div>
+            )}
 
-            <div className="border-t border-slate-200 pt-4">
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Coupon / Referral Code
+            <div className="border-t border-white/10 pt-4">
+              <label className="mb-2 block text-sm font-medium text-slate-300">
+                Coupon / referral code
               </label>
               <div className="flex gap-3">
                 <input
@@ -272,26 +367,26 @@ export default function CheckoutFlow() {
                   value={coupon}
                   onChange={(e) => setCoupon(e.target.value)}
                   placeholder="Enter code"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none"
+                  className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/50"
                 />
                 <button
                   type="button"
                   onClick={handleApplyCoupon}
                   disabled={loading}
-                  className="rounded-xl bg-slate-200 px-4 py-3 text-sm font-medium text-slate-900"
+                  className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white hover:bg-white/15"
                 >
                   {loading ? "Applying..." : "Apply"}
                 </button>
               </div>
             </div>
 
-            {message && <p className="text-sm text-slate-600">{message}</p>}
+            {message && <p className="text-sm text-slate-400">{message}</p>}
 
-            <div className="border-t border-slate-200 pt-4">
+            <div className="border-t border-white/10 pt-4">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-slate-900">Total</span>
-                <span className="text-xl font-bold text-slate-900">
-                  ₹{pricing.finalAmount}
+                <span className="font-semibold text-white">Total</span>
+                <span className="text-xl font-bold text-white">
+                  {courseId ? `₹${pricing.finalAmount}` : "Select a course"}
                 </span>
               </div>
             </div>
@@ -300,9 +395,9 @@ export default function CheckoutFlow() {
               type="button"
               onClick={handlePayment}
               disabled={paying || !courseId}
-              className="w-full rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
+              className="w-full rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/40 transition hover:opacity-95 disabled:opacity-40"
             >
-              {paying ? "Processing..." : "Proceed to Pay"}
+              {paying ? "Processing..." : "Proceed to pay"}
             </button>
 
             <p className="text-center text-xs text-slate-500">
