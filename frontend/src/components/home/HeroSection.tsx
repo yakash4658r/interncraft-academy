@@ -7,22 +7,21 @@ import { FadeIn } from "@/components/animations/FadeIn";
 
 export default function HeroSection() {
   return (
-    <section className="relative min-h-[600px] pt-24 lg:pt-28 overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <section className="relative min-h-[800px] pt-24 lg:pt-28 overflow-hidden bg-[var(--navy-900)]" style={{ fontFamily: 'var(--font-body)' }}>
       <div className="container-premium relative">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center py-16 lg:py-24">
           {/* Left Content */}
           <div className="space-y-6">
             <FadeIn delay={0}>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1]">
+              <h1 className="text-4xl sm:text-5xl lg:text-[56px] font-bold text-white leading-[1.1]" style={{ fontFamily: 'var(--font-display)' }}>
                 Achieve Your Career Goals with{" "}
-                <span className="text-blue-600">Internroll</span>
+                <span className="text-[var(--blue-600)]">Intercraft</span>
               </h1>
             </FadeIn>
 
             <FadeIn delay={0.1}>
-              <p className="text-xl text-slate-600 max-w-lg leading-relaxed">
-                Gain real-world experience with industry-level internships. Learn from experts, 
-                work on live projects, and build a portfolio that gets you hired.
+              <p className="text-xl text-[var(--navy-300)] max-w-lg leading-relaxed">
+                Master industry skills with our expert-led internships. Build real-world projects, get certified, and launch your dream career today.
               </p>
             </FadeIn>
 
@@ -30,12 +29,12 @@ export default function HeroSection() {
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
                   href="/internships"
-                  className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg px-8 py-4 rounded-lg transition-colors shadow-lg shadow-blue-600/25"
+                  className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[var(--blue-600)] hover:bg-[var(--blue-500)] text-white font-semibold rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/25"
                 >
                   Explore Internships
                   <ArrowRight className="w-5 h-5" />
                 </Link>
-                <button className="inline-flex items-center justify-center gap-2 border-2 border-slate-300 hover:border-slate-400 text-slate-700 font-semibold text-lg px-8 py-4 rounded-lg transition-colors">
+                <button className="inline-flex items-center justify-center gap-2 border-2 border-[var(--navy-400)] hover:border-[var(--navy-300)] text-white font-semibold text-lg px-8 py-4 rounded-lg transition-colors bg-[var(--navy-800)]">
                   <Play className="w-5 h-5 fill-current" />
                   Watch Video
                 </button>
@@ -43,8 +42,8 @@ export default function HeroSection() {
             </FadeIn>
 
             <FadeIn delay={0.3}>
-              <div className="flex items-center gap-2 text-sm text-slate-500 pt-2">
-                <span className="font-semibold text-slate-700">Trusted by 50,000+</span> students from top companies & universities
+              <div className="flex items-center gap-2 text-sm text-[var(--navy-300)] pt-2">
+                <span className="font-semibold text-white">Trusted by 50,000+</span> students from top companies & universities
               </div>
             </FadeIn>
           </div>

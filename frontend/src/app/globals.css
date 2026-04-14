@@ -1,19 +1,38 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
 
 :root {
-  --color-primary: #0056d2;
-  --color-primary-dark: #003e9c;
-  --color-accent: #382d8b;
-  --color-slate-900: #1f1f1f;
-  --color-slate-800: #2d2d2d;
-  --color-slate-700: #444;
-  --color-slate-600: #666;
-  --color-slate-500: #757575;
-  --color-slate-400: #999;
-  --color-slate-300: #c7c7c7;
-  --color-slate-200: #e0e0e0;
-  --color-slate-100: #f5f5f5;
-  --color-slate-50: #fafafa;
+  /* Intercraft Navy Color Scale */
+  --navy-900: #0a1628;
+  --navy-800: #162236;
+  --navy-700: #1d2d42;
+  --navy-600: #243752;
+  --navy-500: #2d4363;
+  --navy-400: #4a5f7f;
+  --navy-300: #8a9ab0;
+  --navy-200: #c6d0db;
+  --navy-100: #eef1f5;
+
+  /* Blue Scale */
+  --blue-700: #0056d2;
+  --blue-600: #0061f0;
+  --blue-500: #0080ff;
+
+  /* Cyan Accent */
+  --cyan-500: #00c7b7;
+  --cyan-400: #0ce5d3;
+
+  /* Gold */
+  --gold: #ffb800;
+
+  /* Primary Colors */
+  --color-primary: var(--blue-600);
+  --color-primary-dark: var(--navy-800);
+  --color-accent: var(--cyan-500);
+
+  /* Font Families */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
 }
 
 html {

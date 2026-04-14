@@ -9,10 +9,10 @@ const companies = [
 
 export default function TrustedBy() {
   return (
-    <section className="py-12 bg-white border-b border-slate-200">
+    <section className="py-16 bg-[var(--navy-800)]" style={{ fontFamily: 'var(--font-body)' }}>
       <div className="container-premium">
         <FadeIn>
-          <p className="text-center text-sm text-slate-500 mb-6">
+          <p className="text-center text-sm text-[var(--navy-300)] mb-8" style={{ fontFamily: 'var(--font-body)' }}>
             Trusted by students from top companies & universities
           </p>
         </FadeIn>
@@ -22,7 +22,7 @@ export default function TrustedBy() {
             {companies.map((company) => (
               <div
                 key={company}
-                className="text-lg lg:text-xl font-bold text-slate-300 hover:text-slate-400 transition-colors"
+                className="text-lg lg:text-xl font-bold text-[var(--navy-400)] hover:text-[var(--navy-300)] transition-colors"
               >
                 {company}
               </div>

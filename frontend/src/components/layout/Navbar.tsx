@@ -7,8 +7,9 @@ import { Menu, X, Search, ChevronDown } from "lucide-react";
 
 const navLinks = [
   { name: "Explore", href: "/internships", hasDropdown: true },
-  { name: "Categories", href: "#categories" },
-  { name: "Success Stories", href: "#testimonials" },
+  { name: "Degrees", href: "#degrees" },
+  { name: "Certifications", href: "#certifications" },
+  { name: "Careers", href: "#careers" },
 ];
 
 const categories = [
@@ -16,8 +17,9 @@ const categories = [
   { name: "Data Structures", href: "/internships/dsa" },
   { name: "Digital Marketing", href: "/internships/digital-marketing" },
   { name: "Python Development", href: "/internships/python-development" },
-  { name: "Backend Development", href: "/internships/backend-development" },
-  { name: "Accounting & Finance", href: "/internships/accounting-finance" },
+  { name: "Web Development", href: "/internships/web-development" },
+  { name: "UI/UX Design", href: "/internships/ui-ux-design" },
+  { name: "Full Stack", href: "/internships/full-stack" },
 ];
 
 export default function Navbar() {
@@ -45,15 +47,17 @@ export default function Navbar() {
             : "bg-white"
         }`}
       >
-        <div className="container-premium">
-          <nav className="flex items-center justify-between h-16 lg:h-20">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">I</span>
+        <div className="px-[6%] max-w-[1600px] mx-auto">
+          <nav className="flex items-center justify-between h-[72px]">
+            {/* Logo - Intercraft Style */}
+            <Link href="/" className="flex items-center gap-2.5">
+              <div className="w-10 h-10 bg-gradient-to-br from-[var(--blue-600)] to-[var(--cyan-500)] rounded-lg flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
               </div>
-              <span className="text-xl font-bold text-slate-800">
-                Intern<span className="text-blue-600">roll</span>
+              <span className="text-2xl font-bold text-[var(--navy-900)]" style={{ fontFamily: 'var(--font-display)' }}>
+                Inter<span className="text-[var(--blue-600)]">craft</span>
               </span>
             </Link>
 
