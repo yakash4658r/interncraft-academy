@@ -2,7 +2,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
 
 :root {
-  /* Intercraft Navy Color Scale */
   --navy-900: #0a1628;
   --navy-800: #162236;
   --navy-700: #1d2d42;
@@ -12,25 +11,14 @@
   --navy-300: #8a9ab0;
   --navy-200: #c6d0db;
   --navy-100: #eef1f5;
-
-  /* Blue Scale */
   --blue-700: #0056d2;
   --blue-600: #0061f0;
   --blue-500: #0080ff;
-
-  /* Cyan Accent */
   --cyan-500: #00c7b7;
   --cyan-400: #0ce5d3;
-
-  /* Gold */
   --gold: #ffb800;
-
-  /* Primary Colors */
   --color-primary: var(--blue-600);
-  --color-primary-dark: var(--navy-800);
   --color-accent: var(--cyan-500);
-
-  /* Font Families */
   --font-display: 'Fraunces', Georgia, serif;
   --font-body: 'DM Sans', system-ui, sans-serif;
 }
